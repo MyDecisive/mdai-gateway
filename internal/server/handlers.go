@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/decisiveai/mdai-gateway/internal/variables"
 	"io"
 	"net/http"
 
@@ -12,13 +13,9 @@ import (
 	"github.com/decisiveai/mdai-data-core/eventing"
 	"github.com/decisiveai/mdai-data-core/eventing/config"
 	"github.com/decisiveai/mdai-data-core/eventing/publisher"
-	datacore "github.com/decisiveai/mdai-data-core/variables"
 	"github.com/decisiveai/mdai-gateway/internal/adapter"
 	"github.com/decisiveai/mdai-gateway/internal/httputil"
-	"github.com/decisiveai/mdai-gateway/internal/manualvariables"
 	"github.com/decisiveai/mdai-gateway/internal/nats"
-	"github.com/decisiveai/mdai-gateway/internal/stringutil"
-	"github.com/decisiveai/mdai-gateway/internal/valkey"
 	"github.com/prometheus/alertmanager/notify/webhook"
 	"github.com/prometheus/alertmanager/template"
 	"go.uber.org/zap"
@@ -83,18 +80,7 @@ func handleGetVariables(ctx context.Context, deps HandlerDeps) http.HandlerFunc 
 			return
 		}
 
-		varType, err := manualvariables.GetVarType(hubName, varName, hubsVariables)
-		if err != nil {
-			status := http.StatusInternalServerError
-			var httpErr manualvariables.HTTPError
-			if errors.As(err, &httpErr) {
-				status = httpErr.HTTPStatus()
-			}
-			httputil.WriteJSONResponse(w, deps.Logger, status, err.Error())
-			return
-		}
-
-		valkeyValue, err := valkey.GetValue(ctx, datacore.NewValkeyAdapter(deps.ValkeyClient, deps.Logger), varName, varType, hubName)
+		valkeyValue, err := variables.GetVarValue(hubName, varName, hubsVariables)
 		if err != nil {
 			httputil.WriteJSONResponse(w, deps.Logger, http.StatusInternalServerError, err.Error())
 			return
@@ -126,16 +112,16 @@ func handleSetDeleteVariables(ctx context.Context, deps HandlerDeps) http.Handle
 			return
 		}
 
-		varType, err := manualvariables.GetVarType(hubName, varName, hubsVariables)
-		if err != nil {
-			status := http.StatusInternalServerError
-			var httpErr manualvariables.HTTPError
-			if errors.As(err, &httpErr) {
-				status = httpErr.HTTPStatus()
-			}
-			httputil.WriteJSONResponse(w, deps.Logger, status, err.Error())
-			return
-		}
+		//varType, err := variables.GetVarValue(hubName, varName, hubsVariables)
+		//if err != nil {
+		//	status := http.StatusInternalServerError
+		//	var httpErr variables.HTTPError
+		//	if errors.As(err, &httpErr) {
+		//		status = httpErr.HTTPStatus()
+		//	}
+		//	httputil.WriteJSONResponse(w, deps.Logger, status, err.Error())
+		//	return
+		//}
 
 		var raw map[string]json.RawMessage
 		if err = json.NewDecoder(r.Body).Decode(&raw); err != nil {
@@ -148,50 +134,50 @@ func handleSetDeleteVariables(ctx context.Context, deps HandlerDeps) http.Handle
 			return
 		}
 
-		command := valkey.CommandAdd
-		if r.Method == http.MethodDelete {
-			command = valkey.CommandDel
-		}
-
-		parser, err := valkey.GetParser(varType, command)
-		if err != nil {
-			http.Error(w, "Invalid request payload: "+err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		payload, err := parser(raw["data"])
-		if err != nil {
-			http.Error(w, "Invalid request payload: "+stringutil.UpperFirst(err.Error()), http.StatusBadRequest)
-			return
-		}
-
-		event, err := eventing.NewMdaiEvent(hubName, varName, string(varType), string(command), payload)
-		if err != nil {
-			http.Error(w, "Invalid request payload", http.StatusBadRequest)
-			return
-		}
-
-		subject := subjectFromVarsEvent(*event, varName)
-
-		deps.Logger.Info("Publishing MdaiEvent",
-			zap.String("id", event.ID),
-			zap.String("name", event.Name),
-			zap.String("source", event.Source),
-			zap.String("subject", subject.String()),
-		)
-
-		if _, err := nats.PublishEvents(ctx, deps.Logger, deps.EventPublisher, []adapter.EventPerSubject{{Event: *event, Subject: subject}}, deps.AuditAdapter); err != nil {
-			deps.Logger.Error("Failed to publish MdaiEvent", zap.Error(err))
-			http.Error(w, fmt.Sprintf("Failed to publish event: %v", err), http.StatusInternalServerError)
-			return
-		}
+		//command := valkey.CommandAdd
+		//if r.Method == http.MethodDelete {
+		//	command = valkey.CommandDel
+		//}
+		//
+		//parser, err := valkey.GetParser(varType, command)
+		//if err != nil {
+		//	http.Error(w, "Invalid request payload: "+err.Error(), http.StatusBadRequest)
+		//	return
+		//}
+		//
+		//payload, err := parser(raw["data"])
+		//if err != nil {
+		//	http.Error(w, "Invalid request payload: "+stringutil.UpperFirst(err.Error()), http.StatusBadRequest)
+		//	return
+		//}
+		//
+		//event, err := eventing.NewMdaiEvent(hubName, varName, string(varType), string(command), payload)
+		//if err != nil {
+		//	http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		//	return
+		//}
+		//
+		//subject := subjectFromVarsEvent(*event, varName)
+		//
+		//deps.Logger.Info("Publishing MdaiEvent",
+		//	zap.String("id", event.ID),
+		//	zap.String("name", event.Name),
+		//	zap.String("source", event.Source),
+		//	zap.String("subject", subject.String()),
+		//)
+		//
+		//if _, err := nats.PublishEvents(ctx, deps.Logger, deps.EventPublisher, []adapter.EventPerSubject{{Event: *event, Subject: subject}}, deps.AuditAdapter); err != nil {
+		//	deps.Logger.Error("Failed to publish MdaiEvent", zap.Error(err))
+		//	http.Error(w, fmt.Sprintf("Failed to publish event: %v", err), http.StatusInternalServerError)
+		//	return
+		//}
 
 		status := http.StatusOK
 		if r.Method == http.MethodPost {
 			status = http.StatusCreated
 		}
 
-		httputil.WriteJSONResponse(w, deps.Logger, status, event)
+		httputil.WriteJSONResponse(w, deps.Logger, status, "event")
 	}
 }
 
