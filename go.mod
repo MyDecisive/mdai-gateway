@@ -5,7 +5,7 @@ go 1.24.0
 toolchain go1.24.3
 
 require (
-	github.com/decisiveai/mdai-data-core v0.2.9
+	github.com/decisiveai/mdai-data-core v0.2.10-0.20260205183811-56542ad24c16
 	github.com/google/uuid v1.6.0
 	github.com/nats-io/nats-server/v2 v2.11.8
 	github.com/open-telemetry/opamp-go v0.22.0
@@ -88,6 +88,7 @@ require (
 	github.com/prometheus/exporter-toolkit v0.13.2 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
 	github.com/prometheus/sigv4 v0.1.0 // indirect
+	github.com/samber/lo v1.52.0 // indirect
 	github.com/sean-/seed v0.0.0-20170313163322-e2103e2c3529 // indirect
 	github.com/shurcooL/httpfs v0.0.0-20230704072500-f1e31cf0ba5c // indirect
 	github.com/shurcooL/vfsgen v0.0.0-20230704071429-0000e147ea92 // indirect
