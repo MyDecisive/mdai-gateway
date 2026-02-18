@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/decisiveai/mdai-gateway/internal/variables"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -15,7 +16,6 @@ import (
 	"github.com/decisiveai/mdai-data-core/audit"
 	"github.com/decisiveai/mdai-data-core/eventing"
 	datacorekube "github.com/decisiveai/mdai-data-core/kube"
-	"github.com/decisiveai/mdai-gateway/internal/manualvariables"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/valkey-io/valkey-go"
@@ -78,8 +78,8 @@ func TestHandleListVariables(t *testing.T) {
 			name:   "List",
 			target: "/variables/list",
 			status: http.StatusOK,
-			out:    &manualvariables.ByHub{},
-			expected: &manualvariables.ByHub{
+			out:    &variables.ByHub{},
+			expected: &variables.ByHub{
 				"mdaihub-sample": {
 					"data_boolean": "boolean",
 					"data_map":     "map",

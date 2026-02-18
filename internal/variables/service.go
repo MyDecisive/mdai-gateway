@@ -1,9 +1,7 @@
-package manualvariables
+package variables
 
 import (
 	"net/http"
-
-	"github.com/decisiveai/mdai-gateway/internal/valkey"
 )
 
 type ByHub map[string]map[string]string
@@ -15,7 +13,7 @@ var (
 	ErrVariableNotFound       = HTTPError{"variable not found", http.StatusNotFound}
 )
 
-func GetVarType(hubName string, varName string, hubsVariables ByHub) (valkey.VariableType, error) {
+func GetVarValue(hubName string, varName string, hubsVariables ByHub) (string, error) {
 	if len(hubsVariables) == 0 {
 		return "", ErrNoManualVariablesFound
 	}
@@ -29,10 +27,10 @@ func GetVarType(hubName string, varName string, hubsVariables ByHub) (valkey.Var
 		return "", ErrHubNotFound
 	}
 
-	varType, ok := hubFound[varName]
+	varValue, ok := hubFound[varName]
 	if !ok {
 		return "", ErrVariableNotFound
 	}
 
-	return valkey.VariableType(varType), nil
+	return varValue, nil
 }
