@@ -34,7 +34,7 @@ func initDependencies(ctx context.Context) (deps server.HandlerDeps, cleanup fun
 		app.Fatal("failed to start NATS publisher", zap.Error(err))
 	}
 
-	cmController, err := startConfigMapControllerWithClient(app, datacorekube.ManualEnvConfigMapType, corev1.NamespaceAll)
+	cmController, err := startConfigMapControllerWithClient(app, []string{datacorekube.ManualEnvConfigMapType}, corev1.NamespaceAll)
 	if err != nil {
 		app.Fatal("failed to start config map controller", zap.Error(err))
 	}
@@ -71,10 +71,10 @@ func initDependencies(ctx context.Context) (deps server.HandlerDeps, cleanup fun
 func startConfigMapController(
 	logger *zap.Logger,
 	clientset kubernetes.Interface,
-	configMapType string,
+	configMapTypes []string,
 	namespace string,
 ) (*datacorekube.ConfigMapController, error) {
-	controller, err := datacorekube.NewConfigMapController(configMapType, namespace, clientset, logger)
+	controller, err := datacorekube.NewConfigMapController(configMapTypes, namespace, clientset, logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create ConfigMap controller: %w", err)
 	}
@@ -88,7 +88,7 @@ func startConfigMapController(
 
 func startConfigMapControllerWithClient(
 	logger *zap.Logger,
-	configMapType string,
+	configMapTypes []string,
 	namespace string,
 ) (*datacorekube.ConfigMapController, error) {
 	clientset, err := datacorekube.NewK8sClient(logger)
@@ -96,5 +96,5 @@ func startConfigMapControllerWithClient(
 		return nil, fmt.Errorf("failed to create Kubernetes client: %w", err)
 	}
 
-	return startConfigMapController(logger, clientset, configMapType, namespace)
+	return startConfigMapController(logger, clientset, configMapTypes, namespace)
 }

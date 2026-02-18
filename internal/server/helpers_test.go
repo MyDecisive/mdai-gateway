@@ -80,7 +80,7 @@ func newFakeConfigMapController(t *testing.T, clientset kubernetes.Interface, na
 		return nil, err
 	}
 
-	c, err := datacorekube.NewConfigMapController(datacorekube.ManualEnvConfigMapType, namespace, clientset, zap.NewNop())
+	c, err := datacorekube.NewConfigMapController([]string{datacorekube.ManualEnvConfigMapType}, namespace, clientset, zap.NewNop())
 	if err != nil {
 		return nil, err
 	}
