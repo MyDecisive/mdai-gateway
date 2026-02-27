@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-
 	"github.com/decisiveai/mdai-data-core/audit"
 	datacorepublisher "github.com/decisiveai/mdai-data-core/eventing/publisher"
 	datacorekube "github.com/decisiveai/mdai-data-core/kube"
@@ -15,54 +14,81 @@ import (
 	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
+	"os"
+	"strings"
 )
 
-const publisherClientName = "publisher-mdai-gateway"
+const (
+	namespaceFilePath   = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
+	publisherClientName = "publisher-mdai-gateway"
+)
+
+func getCurrentNamespace() string {
+	if ns := os.Getenv("POD_NAMESPACE"); ns != "" {
+		return ns
+	}
+
+	if data, err := os.ReadFile(namespaceFilePath); err == nil {
+		ns := strings.TrimSpace(string(data))
+		if ns != "" {
+			return ns
+		}
+	}
+
+	return "default"
+}
 
 func initDependencies(ctx context.Context) (deps server.HandlerDeps, cleanup func()) { //nolint:nonamedreturns
-	sys, app, teardown := service.InitLogger(ctx, serviceName)
+	sysLogger, appLogger, teardownFn := service.InitLogger(ctx, serviceName)
 
-	valkeyClient, err := valkey.Init(ctx, app, valkey.NewConfig())
+	valkeyClient, err := valkey.Init(ctx, appLogger, valkey.NewConfig())
 	if err != nil {
-		app.Fatal("failed to initialize valkey client", zap.Error(err))
+		appLogger.Fatal("failed to initialize valkey client", zap.Error(err))
 	}
 
-	auditAdapter := audit.NewAuditAdapter(app, valkeyClient)
+	auditAdapter := audit.NewAuditAdapter(appLogger, valkeyClient)
 
-	publisher, err := datacorepublisher.NewPublisher(ctx, app, publisherClientName)
+	publisher, err := datacorepublisher.NewPublisher(ctx, appLogger, publisherClientName)
 	if err != nil {
-		app.Fatal("failed to start NATS publisher", zap.Error(err))
+		appLogger.Fatal("failed to start NATS publisher", zap.Error(err))
 	}
 
-	cmController, err := startConfigMapControllerWithClient(app, datacorekube.ManualEnvConfigMapType, corev1.NamespaceAll)
+	clientset, err := datacorekube.NewK8sClient(appLogger)
 	if err != nil {
-		app.Fatal("failed to start config map controller", zap.Error(err))
+		appLogger.Fatal("failed to create Kubernetes client: %w", zap.Error(err))
+	}
+
+	cmController, err := startConfigMapController(appLogger, clientset, datacorekube.ManualEnvConfigMapType, corev1.NamespaceAll)
+	if err != nil {
+		appLogger.Fatal("failed to start config map controller", zap.Error(err))
 	}
 
 	deduper := adapter.NewDeduper()
 
-	opampServer, err := opamp.NewOpAMPControlServer(app, auditAdapter, publisher)
+	opampServer, err := opamp.NewOpAMPControlServer(appLogger, auditAdapter, publisher)
 	if err != nil {
-		app.Fatal("failed to start OpAMP server", zap.Error(err))
+		appLogger.Fatal("failed to start OpAMP server", zap.Error(err))
 	}
 
 	deps = server.HandlerDeps{
-		Logger:              app,
+		Logger:              appLogger,
 		ValkeyClient:        valkeyClient,
 		EventPublisher:      publisher,
 		ConfigMapController: cmController,
 		AuditAdapter:        auditAdapter,
 		Deduper:             deduper,
 		OpAMPServer:         opampServer,
+		K8sClient:           clientset,
+		K8sNamespace:        getCurrentNamespace(),
 	}
 
 	cleanup = func() {
-		app.Info("Closing client connections...")
+		appLogger.Info("Closing client connections...")
 		valkeyClient.Close()
 		_ = publisher.Close()
 		cmController.Stop()
-		sys.Info("Cleanup complete.")
-		teardown()
+		sysLogger.Info("Cleanup complete.")
+		teardownFn()
 	}
 
 	return deps, cleanup
@@ -84,17 +110,4 @@ func startConfigMapController(
 	}
 
 	return controller, nil
-}
-
-func startConfigMapControllerWithClient(
-	logger *zap.Logger,
-	configMapType string,
-	namespace string,
-) (*datacorekube.ConfigMapController, error) {
-	clientset, err := datacorekube.NewK8sClient(logger)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Kubernetes client: %w", err)
-	}
-
-	return startConfigMapController(logger, clientset, configMapType, namespace)
 }

@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"k8s.io/client-go/kubernetes"
 	"net/http"
 	"strings"
 
@@ -22,6 +23,8 @@ type HandlerDeps struct {
 	ConfigMapController *datacorekube.ConfigMapController
 	Deduper             *adapter.Deduper
 	OpAMPServer         *opamp.OpAMPControlServer
+	K8sClient           kubernetes.Interface
+	K8sNamespace        string
 }
 
 func NewRouter(ctx context.Context, deps HandlerDeps) *http.ServeMux {
@@ -35,6 +38,14 @@ func NewRouter(ctx context.Context, deps HandlerDeps) *http.ServeMux {
 	router.Handle("POST /variables/hub/{hubName}/var/{varName}", handleSetDeleteVariables(ctx, deps))
 	router.Handle("DELETE /variables/hub/{hubName}/var/{varName}", handleSetDeleteVariables(ctx, deps))
 	router.Handle("POST /opamp", deps.OpAMPServer.HandlerFunc)
+
+	router.Handle("GET /integrations/{integrationType}", handleGetIntegrationsOfType(ctx, deps))
+	router.Handle("PUT /integrations/{integrationType}/{integrationName}", handlePutIntegrationData(ctx, deps))
+	router.Handle("DELETE /integrations/{integrationType}/{integrationName}", handleDeleteIntegration(ctx, deps))
+
+	router.Handle("GET /connections", handleGetConnections(ctx, deps))
+	router.Handle("PUT /connections/{connectionName}", handlePutConnection(ctx, deps))
+	router.Handle("DELETE /connections/{connectionName}", handleDeleteConnection(ctx, deps))
 
 	return router
 }

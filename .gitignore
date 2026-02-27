@@ -7,3 +7,5 @@ vendor
 mdai-gateway-*.tgz
 coverage.html
 coverage.out
+.DS_Store
+*/.DS_Store
