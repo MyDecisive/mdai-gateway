@@ -5,7 +5,9 @@ serviceAccount:
   create: false
   automount: true
   annotations: {}
-  name: "mdai-operator-controller-manager"
+  name: "mdai-gateway"
+  integrationSecretNames:
+    - "mdai-gateway-integration"
 
 deployment:
   name: mdai-gateway
